@@ -25,11 +25,20 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Zbuduj APK
-        run: gradle assembleDebug
+      - name: Odtwórz klucz podpisujący
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SUMIENIE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > sumienie3000-release.jks
 
-      - name: Udostępnij APK
+      - name: Zbuduj podpisane APK
+        env:
+          SUMIENIE_KEYSTORE_PASSWORD: ${{ secrets.SUMIENIE_KEYSTORE_PASSWORD }}
+          SUMIENIE_KEY_PASSWORD: ${{ secrets.SUMIENIE_KEY_PASSWORD }}
+        run: gradle assembleRelease
+
+      - name: Udostępnij podpisane APK
         uses: actions/upload-artifact@v4
         with:
-          name: Sumienie3000-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Sumienie3000-release
+          path: app/build/outputs/apk/release/app-release.apk
