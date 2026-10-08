@@ -1,4 +1,4 @@
-﻿package pl.sumienie3000
+package pl.sumienie3000
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
@@ -75,7 +76,6 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun loadModel() {
-
         updateNotification("📦 Ładuję polski model Vosk...")
 
         StorageService.unpack(
@@ -83,16 +83,15 @@ class ListeningService : Service(), RecognitionListener {
             "vosk-model-small-pl-0.22",
             "model",
             { loadedModel ->
-
                 model = loadedModel
 
-                updateNotification("🟢 Model gotowy — SUMIENIE słucha")
+                updateNotification(
+                    "🟢 Model gotowy — SUMIENIE słucha"
+                )
 
                 startVosk()
-
             },
-            { exception ->
-
+            {
                 updateNotification(
                     "❌ Nie udało się załadować modelu"
                 )
@@ -105,9 +104,7 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun startVosk() {
-
         try {
-
             recognizer = Recognizer(
                 model,
                 16000.0f
@@ -123,17 +120,32 @@ class ListeningService : Service(), RecognitionListener {
             updateNotification(
                 "🎙️ Słucham lokalnie — bez chmury"
             )
-
         } catch (e: Exception) {
-
             updateNotification(
                 "❌ Błąd Vosk: ${e.javaClass.simpleName}"
             )
         }
     }
 
-    private fun checkForPolitics(text: String) {
+    private fun extractText(hypothesis: String): String {
+        return try {
+            val json = JSONObject(hypothesis)
 
+            when {
+                json.has("text") ->
+                    json.optString("text", "")
+
+                json.has("partial") ->
+                    json.optString("partial", "")
+
+                else -> ""
+            }
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun checkForPolitics(text: String) {
         val normalized =
             text.lowercase(Locale("pl", "PL"))
 
@@ -151,13 +163,14 @@ class ListeningService : Service(), RecognitionListener {
             }
 
         if (detected) {
-
-            val now =
-                System.currentTimeMillis()
+            val now = System.currentTimeMillis()
 
             if (now - lastJokeTime >= cooldown) {
-
                 lastJokeTime = now
+
+                updateNotification(
+                    "🚨 POLITYKA WYKRYTA — SUMIENIE INTERWENIUJE"
+                )
 
                 val joke = jokes.random()
 
@@ -167,7 +180,6 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun speak(text: String) {
-
         textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
@@ -177,9 +189,7 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun createNotificationChannel() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
             val channel =
                 NotificationChannel(
                     "sumienie_channel",
@@ -199,7 +209,6 @@ class ListeningService : Service(), RecognitionListener {
     private fun createNotification(
         text: String
     ): Notification {
-
         return NotificationCompat.Builder(
             this,
             "sumienie_channel"
@@ -216,59 +225,63 @@ class ListeningService : Service(), RecognitionListener {
     private fun updateNotification(
         text: String
     ) {
-
         val manager =
             getSystemService(
                 NotificationManager::class.java
             )
 
-        manager.notify(
             1,
             createNotification(text)
         )
     }
 
+
     override fun onPartialResult(
         hypothesis: String?
     ) {
-
         if (!hypothesis.isNullOrBlank()) {
+            val text = extractText(hypothesis)
 
-            checkForPolitics(hypothesis)
+
+            if (text.isNotBlank()) {
+                updateNotification("👂 $text")
+            }
         }
     }
 
     override fun onResult(
         hypothesis: String?
     ) {
-
         if (!hypothesis.isNullOrBlank()) {
+            val text = extractText(hypothesis)
 
-            checkForPolitics(hypothesis)
+            if (text.isNotBlank()) {
+                checkForPolitics(text)
+            }
         }
     }
 
     override fun onFinalResult(
         hypothesis: String?
     ) {
-
         if (!hypothesis.isNullOrBlank()) {
+            val text = extractText(hypothesis)
 
-            checkForPolitics(hypothesis)
+            if (text.isNotBlank()) {
+                checkForPolitics(text)
+            }
         }
     }
 
     override fun onError(
         exception: Exception?
     ) {
-
         updateNotification(
             "⚠️ Błąd Vosk — próbuję ponownie"
         )
     }
 
     override fun onTimeout() {
-
         updateNotification(
             "⏳ Ponawiam nasłuchiwanie..."
         )
@@ -281,15 +294,12 @@ class ListeningService : Service(), RecognitionListener {
         flags: Int,
         startId: Int
     ): Int {
-
         return START_STICKY
     }
 
     override fun onDestroy() {
-
         speechService?.stop()
         speechService?.shutdown()
-
         speechService = null
 
         recognizer?.close()
@@ -308,7 +318,6 @@ class ListeningService : Service(), RecognitionListener {
     override fun onBind(
         intent: Intent?
     ): IBinder? {
-
         return null
     }
 }
