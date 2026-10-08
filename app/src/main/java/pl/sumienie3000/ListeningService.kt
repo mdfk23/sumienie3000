@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -57,8 +58,15 @@ class ListeningService : Service(), RecognitionListener {
 
         createNotificationChannel()
 
-        textToSpeech = TextToSpeech(this) {
-            textToSpeech?.language = Locale("pl", "PL")
+        startForeground(
+            1,
+            createNotification()
+        )
+
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                textToSpeech?.language = Locale("pl", "PL")
+            }
         }
 
         startSpeechRecognition()
@@ -80,8 +88,16 @@ class ListeningService : Service(), RecognitionListener {
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pl-PL")
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                "pl-PL"
+            )
+
+            putExtra(
+                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                true
+            )
         }
 
         speechRecognizer?.startListening(intent)
@@ -89,6 +105,10 @@ class ListeningService : Service(), RecognitionListener {
 
     private fun checkForPolitics(text: String) {
         val normalized = text.lowercase(Locale("pl", "PL"))
+
+        if (normalized.isNotBlank()) {
+            speak("Słyszę: $normalized")
+        }
 
         val detected = politicalWords.any { word ->
             normalized.contains(word)
@@ -123,13 +143,18 @@ class ListeningService : Service(), RecognitionListener {
                 NotificationManager.IMPORTANCE_LOW
             )
 
-            val manager = getSystemService(NotificationManager::class.java)
+            val manager =
+                getSystemService(NotificationManager::class.java)
+
             manager.createNotificationChannel(channel)
         }
     }
 
     private fun createNotification(): Notification {
-        return NotificationCompat.Builder(this, "sumienie_channel")
+        return NotificationCompat.Builder(
+            this,
+            "sumienie_channel"
+        )
             .setContentTitle("SUMIENIE 3000")
             .setContentText("🎙️ Nasłuchuję rozmowy")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
@@ -142,11 +167,10 @@ class ListeningService : Service(), RecognitionListener {
         flags: Int,
         startId: Int
     ): Int {
-        startForeground(1, createNotification())
         return START_STICKY
     }
 
-    override fun onResults(results: android.os.Bundle?) {
+    override fun onResults(results: Bundle?) {
         val matches = results?.getStringArrayList(
             SpeechRecognizer.RESULTS_RECOGNITION
         )
@@ -158,7 +182,7 @@ class ListeningService : Service(), RecognitionListener {
         startSpeechRecognition()
     }
 
-    override fun onPartialResults(partialResults: android.os.Bundle?) {
+    override fun onPartialResults(partialResults: Bundle?) {
         val matches = partialResults?.getStringArrayList(
             SpeechRecognizer.RESULTS_RECOGNITION
         )
@@ -172,12 +196,26 @@ class ListeningService : Service(), RecognitionListener {
         startSpeechRecognition()
     }
 
-    override fun onReadyForSpeech(params: android.os.Bundle?) {}
-    override fun onBeginningOfSpeech() {}
-    override fun onRmsChanged(rmsdB: Float) {}
-    override fun onBufferReceived(buffer: ByteArray?) {}
-    override fun onEndOfSpeech() {}
-    override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+    override fun onReadyForSpeech(params: Bundle?) {
+    }
+
+    override fun onBeginningOfSpeech() {
+    }
+
+    override fun onRmsChanged(rmsdB: Float) {
+    }
+
+    override fun onBufferReceived(buffer: ByteArray?) {
+    }
+
+    override fun onEndOfSpeech() {
+    }
+
+    override fun onEvent(
+        eventType: Int,
+        params: Bundle?
+    ) {
+    }
 
     override fun onDestroy() {
         speechRecognizer?.destroy()
