@@ -7,6 +7,15 @@ android {
     namespace = "pl.sumienie3000"
     compileSdk = 35
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     defaultConfig {
         applicationId = "pl.sumienie3000"
         minSdk = 26
