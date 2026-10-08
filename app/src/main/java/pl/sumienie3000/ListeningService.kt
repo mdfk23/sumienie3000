@@ -131,14 +131,12 @@ class ListeningService : Service(), RecognitionListener {
         return try {
             val json = JSONObject(hypothesis)
 
-            when {
-                json.has("text") ->
-                    json.optString("text", "")
-
-                json.has("partial") ->
-                    json.optString("partial", "")
-
-                else -> ""
+            if (json.has("text")) {
+                json.optString("text", "")
+            } else if (json.has("partial")) {
+                json.optString("partial", "")
+            } else {
+                ""
             }
         } catch (e: Exception) {
             ""
@@ -146,21 +144,17 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun checkForPolitics(text: String) {
-        val normalized =
-            text.lowercase(Locale("pl", "PL"))
+        val normalized = text.lowercase(Locale("pl", "PL"))
 
         if (normalized.isBlank()) {
             return
         }
 
-        updateNotification(
-            "👂 $normalized"
-        )
+        updateNotification("👂 $normalized")
 
-        val detected =
-            politicalWords.any { word ->
-                normalized.contains(word)
-            }
+        val detected = politicalWords.any { word ->
+            normalized.contains(word)
+        }
 
         if (detected) {
             val now = System.currentTimeMillis()
@@ -190,72 +184,44 @@ class ListeningService : Service(), RecognitionListener {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel =
-                NotificationChannel(
-                    "sumienie_channel",
-                    "SUMIENIE 3000",
-                    NotificationManager.IMPORTANCE_LOW
-                )
+            val channel = NotificationChannel(
+                "sumienie_channel",
+                "SUMIENIE 3000",
+                NotificationManager.IMPORTANCE_LOW
+            )
 
             val manager =
-                getSystemService(
-                    NotificationManager::class.java
-                )
+                getSystemService(NotificationManager::class.java)
 
             manager.createNotificationChannel(channel)
         }
     }
 
-    private fun createNotification(
-        text: String
-    ): Notification {
+    private fun createNotification(text: String): Notification {
         return NotificationCompat.Builder(
             this,
             "sumienie_channel"
         )
             .setContentTitle("SUMIENIE 3000")
             .setContentText(text)
-            .setSmallIcon(
-                android.R.drawable.ic_btn_speak_now
-            )
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)
             .build()
     }
 
-    private fun updateNotification(
-        text: String
-    ) {
+    private fun updateNotification(text: String) {
         val manager =
-            getSystemService(
-                NotificationManager::class.java
-            )
+            getSystemService(NotificationManager::class.java)
 
+        manager.notify(
             1,
             createNotification(text)
         )
     }
 
-
-    override fun onPartialResult(
-        hypothesis: String?
-    ) {
+    override fun onPartialResult(hypothesis: String?) {
         if (!hypothesis.isNullOrBlank()) {
             val text = extractText(hypothesis)
-
-
-private fun updateNotification(
-        text: String
-    ) {
-        val manager =
-            getSystemService(
-                NotificationManager::class.java
-            )
-
-            1,
-            createNotification(text)
-        )
-    }
-
 
             if (text.isNotBlank()) {
                 updateNotification("👂 $text")
@@ -263,9 +229,7 @@ private fun updateNotification(
         }
     }
 
-    override fun onResult(
-        hypothesis: String?
-    ) {
+    override fun onResult(hypothesis: String?) {
         if (!hypothesis.isNullOrBlank()) {
             val text = extractText(hypothesis)
 
@@ -275,9 +239,7 @@ private fun updateNotification(
         }
     }
 
-    override fun onFinalResult(
-        hypothesis: String?
-    ) {
+    override fun onFinalResult(hypothesis: String?) {
         if (!hypothesis.isNullOrBlank()) {
             val text = extractText(hypothesis)
 
@@ -287,9 +249,7 @@ private fun updateNotification(
         }
     }
 
-    override fun onError(
-        exception: Exception?
-    ) {
+    override fun onError(exception: Exception?) {
         updateNotification(
             "⚠️ Błąd Vosk — próbuję ponownie"
         )
@@ -329,9 +289,7 @@ private fun updateNotification(
         super.onDestroy()
     }
 
-    override fun onBind(
-        intent: Intent?
-    ): IBinder? {
+    override fun onBind(intent: Intent?): IBinder? {
         return null
     }
 }
