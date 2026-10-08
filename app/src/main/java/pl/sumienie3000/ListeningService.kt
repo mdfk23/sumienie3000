@@ -243,6 +243,20 @@ class ListeningService : Service(), RecognitionListener {
             val text = extractText(hypothesis)
 
 
+private fun updateNotification(
+        text: String
+    ) {
+        val manager =
+            getSystemService(
+                NotificationManager::class.java
+            )
+
+            1,
+            createNotification(text)
+        )
+    }
+
+
             if (text.isNotBlank()) {
                 updateNotification("👂 $text")
             }
