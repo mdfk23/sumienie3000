@@ -25,18 +25,21 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         button = findViewById(R.id.startButton)
 
-        button.setOnClickListener {
-            if (isMicrophonePermissionGranted()) {
-                startListening()
-            } else {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.RECORD_AUDIO),
-                    microphoneRequestCode
-                )
-            }
+     button.setOnClickListener {
+    if (button.text.toString().contains("WŁĄCZ")) {
+        if (isMicrophonePermissionGranted()) {
+            startListening()
+        } else {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                microphoneRequestCode
+            )
         }
+    } else {
+        stopListening()
     }
+}
 
     private fun isMicrophonePermissionGranted(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -53,6 +56,13 @@ class MainActivity : AppCompatActivity() {
         button.text = "🛑 WYŁĄCZ SUMIENIE"
     }
 
+    private fun stopListening() {
+    val intent = Intent(this, ListeningService::class.java)
+    stopService(intent)
+
+    statusText.text = "⚫ SUMIENIE ŚPI"
+    button.text = "🎙️ WŁĄCZ SUMIENIE"
+}
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
