@@ -1,4 +1,4 @@
-package pl.sumienie3000
+﻿package pl.sumienie3000
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -6,18 +6,21 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.Build
-import android.os.Bundle
 import android.os.IBinder
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
+import org.vosk.android.StorageService
 import java.util.Locale
 
 class ListeningService : Service(), RecognitionListener {
 
-    private var speechRecognizer: SpeechRecognizer? = null
+    private var model: Model? = null
+    private var recognizer: Recognizer? = null
+    private var speechService: SpeechService? = null
     private var textToSpeech: TextToSpeech? = null
 
     private var lastJokeTime = 0L
@@ -37,7 +40,6 @@ class ListeningService : Service(), RecognitionListener {
         "tusk",
         "kaczyński",
         "pis",
-        "po",
         "konfederacja",
         "lewica",
         "psl",
@@ -60,7 +62,7 @@ class ListeningService : Service(), RecognitionListener {
 
         startForeground(
             1,
-            createNotification()
+            createNotification("🎙️ Uruchamiam SUMIENIE 3000...")
         )
 
         textToSpeech = TextToSpeech(this) { status ->
@@ -69,64 +71,103 @@ class ListeningService : Service(), RecognitionListener {
             }
         }
 
-        startSpeechRecognition()
+        loadModel()
     }
 
-    private fun startSpeechRecognition() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            speak("Nie mam dostępu do rozpoznawania mowy. Sumienie jest rozczarowane.")
-            return
+    private fun loadModel() {
+
+        updateNotification("📦 Ładuję polski model Vosk...")
+
+        StorageService.unpack(
+            this,
+            "vosk-model-small-pl-0.22",
+            "model",
+            { loadedModel ->
+
+                model = loadedModel
+
+                updateNotification("🟢 Model gotowy — SUMIENIE słucha")
+
+                startVosk()
+
+            },
+            { exception ->
+
+                updateNotification(
+                    "❌ Nie udało się załadować modelu"
+                )
+
+                speak(
+                    "Nie mogę załadować mojego mózgu. To źle wróży."
+                )
+            }
+        )
+    }
+
+    private fun startVosk() {
+
+        try {
+
+            recognizer = Recognizer(
+                model,
+                16000.0f
+            )
+
+            speechService = SpeechService(
+                recognizer,
+                16000.0f
+            )
+
+            speechService?.startListening(this)
+
+            updateNotification(
+                "🎙️ Słucham lokalnie — bez chmury"
+            )
+
+        } catch (e: Exception) {
+
+            updateNotification(
+                "❌ Błąd Vosk: ${e.javaClass.simpleName}"
+            )
         }
-
-        speechRecognizer?.destroy()
-
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer?.setRecognitionListener(this)
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-            )
-
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                "pl-PL"
-            )
-
-            putExtra(
-                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                true
-            )
-        }
-
-        speechRecognizer?.startListening(intent)
     }
 
     private fun checkForPolitics(text: String) {
-        val normalized = text.lowercase(Locale("pl", "PL"))
 
-        if (normalized.isNotBlank()) {
-            speak("Słyszę: $normalized")
+        val normalized =
+            text.lowercase(Locale("pl", "PL"))
+
+        if (normalized.isBlank()) {
+            return
         }
 
-        val detected = politicalWords.any { word ->
-            normalized.contains(word)
-        }
+        updateNotification(
+            "👂 $normalized"
+        )
+
+        val detected =
+            politicalWords.any { word ->
+                normalized.contains(word)
+            }
 
         if (detected) {
-            val now = System.currentTimeMillis()
+
+            val now =
+                System.currentTimeMillis()
 
             if (now - lastJokeTime >= cooldown) {
+
                 lastJokeTime = now
 
                 val joke = jokes.random()
+
                 speak(joke)
             }
         }
     }
 
     private fun speak(text: String) {
+
         textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
@@ -136,30 +177,103 @@ class ListeningService : Service(), RecognitionListener {
     }
 
     private fun createNotificationChannel() {
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "sumienie_channel",
-                "SUMIENIE 3000",
-                NotificationManager.IMPORTANCE_LOW
-            )
+
+            val channel =
+                NotificationChannel(
+                    "sumienie_channel",
+                    "SUMIENIE 3000",
+                    NotificationManager.IMPORTANCE_LOW
+                )
 
             val manager =
-                getSystemService(NotificationManager::class.java)
+                getSystemService(
+                    NotificationManager::class.java
+                )
 
             manager.createNotificationChannel(channel)
         }
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotification(
+        text: String
+    ): Notification {
+
         return NotificationCompat.Builder(
             this,
             "sumienie_channel"
         )
             .setContentTitle("SUMIENIE 3000")
-            .setContentText("🎙️ Nasłuchuję rozmowy")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentText(text)
+            .setSmallIcon(
+                android.R.drawable.ic_btn_speak_now
+            )
             .setOngoing(true)
             .build()
+    }
+
+    private fun updateNotification(
+        text: String
+    ) {
+
+        val manager =
+            getSystemService(
+                NotificationManager::class.java
+            )
+
+        manager.notify(
+            1,
+            createNotification(text)
+        )
+    }
+
+    override fun onPartialResult(
+        hypothesis: String?
+    ) {
+
+        if (!hypothesis.isNullOrBlank()) {
+
+            checkForPolitics(hypothesis)
+        }
+    }
+
+    override fun onResult(
+        hypothesis: String?
+    ) {
+
+        if (!hypothesis.isNullOrBlank()) {
+
+            checkForPolitics(hypothesis)
+        }
+    }
+
+    override fun onFinalResult(
+        hypothesis: String?
+    ) {
+
+        if (!hypothesis.isNullOrBlank()) {
+
+            checkForPolitics(hypothesis)
+        }
+    }
+
+    override fun onError(
+        exception: Exception?
+    ) {
+
+        updateNotification(
+            "⚠️ Błąd Vosk — próbuję ponownie"
+        )
+    }
+
+    override fun onTimeout() {
+
+        updateNotification(
+            "⏳ Ponawiam nasłuchiwanie..."
+        )
+
+        speechService?.startListening(this)
     }
 
     override fun onStartCommand(
@@ -167,59 +281,22 @@ class ListeningService : Service(), RecognitionListener {
         flags: Int,
         startId: Int
     ): Int {
+
         return START_STICKY
     }
 
-    override fun onResults(results: Bundle?) {
-        val matches = results?.getStringArrayList(
-            SpeechRecognizer.RESULTS_RECOGNITION
-        )
-
-        matches?.firstOrNull()?.let {
-            checkForPolitics(it)
-        }
-
-        startSpeechRecognition()
-    }
-
-    override fun onPartialResults(partialResults: Bundle?) {
-        val matches = partialResults?.getStringArrayList(
-            SpeechRecognizer.RESULTS_RECOGNITION
-        )
-
-        matches?.firstOrNull()?.let {
-            checkForPolitics(it)
-        }
-    }
-
-    override fun onError(error: Int) {
-        startSpeechRecognition()
-    }
-
-    override fun onReadyForSpeech(params: Bundle?) {
-    }
-
-    override fun onBeginningOfSpeech() {
-    }
-
-    override fun onRmsChanged(rmsdB: Float) {
-    }
-
-    override fun onBufferReceived(buffer: ByteArray?) {
-    }
-
-    override fun onEndOfSpeech() {
-    }
-
-    override fun onEvent(
-        eventType: Int,
-        params: Bundle?
-    ) {
-    }
-
     override fun onDestroy() {
-        speechRecognizer?.destroy()
-        speechRecognizer = null
+
+        speechService?.stop()
+        speechService?.shutdown()
+
+        speechService = null
+
+        recognizer?.close()
+        recognizer = null
+
+        model?.close()
+        model = null
 
         textToSpeech?.stop()
         textToSpeech?.shutdown()
@@ -228,7 +305,10 @@ class ListeningService : Service(), RecognitionListener {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? {
+
         return null
     }
 }
